@@ -88,8 +88,7 @@ char *get_next_line(int fd)
 	if (fd < 0 || BUFFER_SIZE <= 0)
 		return NULL;
 	while (1)
-	{
-		/* Step 1: remplir le buffer si vide */
+	{ /* Step 1: remplir le buffer si vide */
 		if (buf[0] == '\0')
 		{
 			rd = read(fd, buf, BUFFER_SIZE);
@@ -101,18 +100,15 @@ char *get_next_line(int fd)
 				return NULL;
 			}
 			buf[rd] = '\0';
-		}
-		/* Step 2: chercher newline */
+		} /* Step 2: chercher newline */
 		nl = ft_strchr(buf, '\n');
 		if (nl)
 		{
 			if (!str_append_mem(&line, buf, (size_t)(nl - buf + 1)))
-				return (free(line), NULL);
-			/* Step 3: décaler le reste */
+				return (free(line), NULL); /* Step 3: décaler le reste */
 			ft_memmove(buf, nl + 1, ft_strlen(nl + 1) + 1);
 			return line;
-		}
-		/* Step 4: pas de \n -> append tout le buffer et on relira */
+		} /* Step 4: pas de \n -> append tout le buffer et on relira */
 		if (!str_append_mem(&line, buf, ft_strlen(buf)))
 			return (free(line), NULL);
 		buf[0] = '\0'; /* marquer consommé */
