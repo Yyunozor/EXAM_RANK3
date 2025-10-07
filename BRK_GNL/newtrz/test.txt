@@ -1,0 +1,6 @@
+salut ca va \n
+oui bienn merci \n
+ls -lan
+salut
+ca va +>>>
+salut

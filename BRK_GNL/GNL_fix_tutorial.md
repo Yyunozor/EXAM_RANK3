@@ -1,6 +1,15 @@
-# get_next_line Broken ➜ Fixed Cheat Sheet
+# get_next_line Broken ➜ Fixed Cheat Sheet (Adapté au sujet broken_GNL)
 
-Ce mémo résume les corrections indispensables à apporter à `broken_get_next_line.c` en condition d'examen, sans aide externe.
+## 0. Contraintes du sujet (rappel rapide examen)
+- Fichiers à rendre: `get_next_line.c` `get_next_line.h`
+- Fonctions autorisées: `read`, `malloc`, `free`
+- Interdits dans le rendu: `open`, `close`, `printf`, autres libs non nécessaires
+- Prototype: `char *get_next_line(int fd);`
+- Aucune allocation conservée entre deux EOF (hors buffer statique)
+- Retourne ligne (incluant `\n` si présent), sinon `NULL`
+- Gestion dernière ligne sans `\n`
+- Appels successifs lisent séquentiellement le fd
+- Ajouter un guard: `if (fd < 0 || BUFFER_SIZE <= 0)` -> `return NULL;`
 
 ## 1. Plan d'action express
 
@@ -204,6 +213,45 @@ void *ft_memmove(void *dest, const void *src, size_t n)
 
 - Respecte l'algorithme POSIX : copie backward uniquement si zones se chevauchent.
 
+#### Variante pédagogique (même logique, plus explicite sans appel à ft_memcpy)
+
+```c
+void *ft_memmove(void *dest, const void *src, size_t n)
+{
+    size_t          i;
+    unsigned char       *d;
+    const unsigned char *s;
+
+    if (dest == src || n == 0)
+        return dest;
+    d = (unsigned char*)dest;
+    s = (const unsigned char*)src;
+    if (d < s)
+    {
+        i = 0;
+        while (i < n)
+        {
+            d[i] = s[i];
+            i++;
+        }
+    }
+    else
+    {
+        while (n > 0)
+        {
+            n--;
+            d[n] = s[n];
+        }
+    }
+    return dest;
+}
+```
+
+Points clés rappel:
+- Copie forward si dest avant src (pas de risque d’écrasement).
+- Copie backward si overlap (dest dans la zone source).
+- Pas d’appel externe: lisible à l’oral si tu dois “justifier ligne par ligne”.
+
 ---
 
 ### get_next_line
@@ -242,62 +290,113 @@ char *get_next_line(int fd)
 ```c
 char *get_next_line(int fd)
 {
-    static char buf[BUFFER_SIZE + 1] = "";
-    char *line = NULL;
-    char *nl;
-    int rd;
+	static char buf[BUFFER_SIZE + 1];
+	char *line = NULL;
+	char *nl;
+	int  rd;
 
-    if (buf[0] == '\0')
-    {
-        rd = read(fd, buf, BUFFER_SIZE);
-        if (rd <= 0)
-            return NULL;
-        buf[rd] = '\0';
-    }
-    while (1)
-    {
-        nl = ft_strchr(buf, '\n');
-        if (nl)
-        {
-            if (!str_append_mem(&line, buf, (size_t)(nl - buf + 1)))
-            {
-                free(line);
-                return NULL;
-            }
-            ft_memmove(buf, nl + 1, ft_strlen(nl + 1) + 1);
-            return line;
-        }
-        if (!str_append_mem(&line, buf, ft_strlen(buf)))
-        {
-            free(line);
-            return NULL;
-        }
-        rd = read(fd, buf, BUFFER_SIZE);
-        if (rd <= 0)
-        {
-            buf[0] = '\0';
-            if (line && *line)
-                return line;
-            free(line);
-            return NULL;
-        }
-        buf[rd] = '\0';
-    }
+	if (fd < 0 || BUFFER_SIZE <= 0)
+		return NULL;
+	if (buf[0] == '\0')
+	{
+		rd = read(fd, buf, BUFFER_SIZE);
+		if (rd <= 0)
+			return NULL;
+		buf[rd] = '\0';
+	}
+	while (1)
+	{
+		nl = ft_strchr(buf, '\n');
+		if (nl)
+		{
+			if (!str_append_mem(&line, buf, (size_t)(nl - buf + 1)))
+				return (free(line), NULL);
+			ft_memmove(buf, nl + 1, ft_strlen(nl + 1) + 1);
+			return line;
+		}
+		if (!str_append_mem(&line, buf, ft_strlen(buf)))
+			return (free(line), NULL);
+		rd = read(fd, buf, BUFFER_SIZE);
+		if (rd <= 0)
+		{
+			buf[0] = '\0';
+			if (line && *line)
+				return line;
+			return (free(line), NULL);
+		}
+		buf[rd] = '\0';
+	}
 }
 ```
 
-- Lecture initiale si le buffer est vide, gestion claire de `read <= 0`.
-- Retour de la dernière ligne partielle et nettoyage du buffer statique.
-- Décalage du leftover avec `ft_memmove` pour l'appel suivant.
+## 3. Points critiques validés
+- `ft_strchr` ne dépasse pas / gère NULL
+- `ft_memcpy` copie 0..n-1
+- `ft_memmove` overlap-safe
+- `str_append_mem` gère `*s1 == NULL`
+- Aucune fuite: chaque malloc stocké -> transféré -> free précédent
+- Dernière ligne sans `\n` retournée
+- Retour NULL propre après EOF si aucune donnée
+- Aucun `open/close/printf` dans la version à rendre
 
----
+## 4. Mains de test (HORS RENDU)
 
-## 3. Check-list finale
+Main détaillé:
+```c
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#ifndef BUFFER_SIZE
+# define BUFFER_SIZE 16
+#endif
+char *get_next_line(int fd);
 
-- [ ] Chaque helper corrigé (tests rapides sur brouillon).
-- [ ] `str_append_mem` gère NULL + `\0` final.
-- [ ] `get_next_line` fait : lecture initiale, boucle, gestion `rd <= 0`, leftover.
-- [ ] Petit `main` de validation avec différents `BUFFER_SIZE`.
-- [ ] Contrôle visuel : pas de `return` sans `free`, pas de variables inutilisées.
+int main(int ac, char **av)
+{
+	int fd = (ac == 2) ? open(av[1], O_RDONLY) : 0;
+	char *s;
+	if (fd < 0) return 1;
+	while ((s = get_next_line(fd)))
+	{
+		printf("%s", s);
+		free(s);
+	}
+	if (fd > 2) close(fd);
+	return 0;
+}
+```
 
-Avec cette fiche, tu peux corriger la version broken en ordre logique, sans rien oublier, et justifier chaque changement pendant l’examen.
+Main ultra minimal:
+```c
+int main(void)
+{
+	char *s;
+	while ((s = get_next_line(0)))
+	{
+		write(1, s, ft_strlen(s));
+		free(s);
+	}
+	return 0;
+}
+```
+
+## 5. Routine test rapide
+- `cc -Wall -Wextra -Werror -D BUFFER_SIZE=1 get_next_line.c test_main.c`
+- Cas: fichier vide -> `NULL` direct
+- Fichier terminant sans `\n`
+- Ligne > BUFFER_SIZE (plusieurs lectures)
+- Plusieurs appels consécutifs après EOF -> toujours `NULL`
+
+## 6. Checklist finale (à cocher avant rendu)
+- [ ] Aucun `printf`, `open`, `close` dans `get_next_line.c`
+- [ ] Un seul fichier `.c` + header propre
+- [ ] Guard fd / BUFFER_SIZE
+- [ ] Pas d’allocation résiduelle après EOF
+- [ ] Norme: pas de variables inutilisées / pas de leaks (testé)
+- [ ] Retour inclut `\n` quand présent
+- [ ] Compilation avec plusieurs `-D BUFFER_SIZE=` OK
+
+Concis = crédible. Tu rends uniquement `get_next_line.c` + `get_next_line.h`.
+
+
