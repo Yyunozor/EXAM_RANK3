@@ -23,11 +23,11 @@ int main(int ac, char **av)
    {
       tmp = realloc(buf, i + 2);
       if(!tmp)
-      {
-         perror("Error: ");
-         free(buf);
-         return 1;
-      }
+         {
+            perror("Error: ");
+            free(buf);
+            return 1;
+         }
       buf = tmp;
       i++;
    }
@@ -41,12 +41,12 @@ int main(int ac, char **av)
       if(av[1][j] == '\0')
       {
          k = 0;
-         while(k < j)
+         while (k < j)
          {
-            buf[i + k] = '*';
-            k ++;
+            buf [i + k] = '*';
+            k++;
          }
-         i += j;
+         i = i + j;
       }
       else
          i++;
