@@ -2,16 +2,17 @@
 
 char *ft_strchr(char *s, int c)
 {
-	size_t i = 0;
+	int i = 0;
 	unsigned char uc = (unsigned char)c;
 
-	if (!s)
+	if(!s)
 		return NULL;
-	while (s[i] && (unsigned char)s[i] != uc)
+	while (s[i] && s[i] != (unsigned char)uc)
 		i++;
-	if ((unsigned char)s[i] == uc)
+	if ((unsigned char)s[i] == (unsigned char)uc)
 		return s + i;
-	return NULL;
+	else
+		return NULL;
 }
 
 void *ft_memcpy(void *dest, const void *src, size_t n)
@@ -19,7 +20,7 @@ void *ft_memcpy(void *dest, const void *src, size_t n)
 	size_t i = 0;
 	while (i < n)
 	{
-		((char*)dest)[i] = ((char*)src)[i];
+		((unsigned char*)dest)[i] = ((const unsigned char*)src)[i];
 		i++;
 	}
 	return dest;
@@ -36,7 +37,7 @@ size_t ft_strlen(char *s)
 int str_append_mem(char **s1, char *s2, size_t size2)
 {
 	size_t size1 = (*s1) ? ft_strlen(*s1) : 0;
-	char *tmp = malloc(size2 + size1 + 1);
+	char *tmp = malloc(size1 + size2 + 1);
 	if (!tmp)
 		return 0;
 	if(*s1)
@@ -48,22 +49,17 @@ int str_append_mem(char **s1, char *s2, size_t size2)
 	return 1;
 }
 
-int str_append_str(char **s1, char *s2)
-{
-	return str_append_mem(s1, s2, ft_strlen(s2));
-}
-
 void *ft_memmove(void *dest, const void *src, size_t n)
 {
-	size_t				i;
-	unsigned char	 	*d;
+	unsigned char *d;
 	const unsigned char *s;
-
-	if(dest == src || n == 0)
+	size_t i = 0;
+	if (dest == src || n == 0)
 		return dest;
 	d = (unsigned char*)dest;
 	s = (const unsigned char*)src;
-	if(d < s)
+	
+	if (d < s)
 	{
 		i = 0;
 		while (i < n)
@@ -72,51 +68,77 @@ void *ft_memmove(void *dest, const void *src, size_t n)
 			i++;
 		}
 	}
-	else{
+	else
+	{
 		while(n > 0)
 		{
 			n--;
 			d[n] = s[n];
 		}
 	}
-	return 				dest;
+	return dest;
 }
 
 char *get_next_line(int fd)
 {
-	static char buf[BUFFER_SIZE + 1]; // Buffer persistant entre les appels
-	char		*line = NULL;
-	char		*nl;
-	int			rd;
-
-	if (fd < 0 || BUFFER_SIZE <= 0)
+	static char buf[BUFFER_SIZE + 1] = "";
+	char *line = NULL;
+	char *nl;
+	int rd;
+	
+	if(fd < 0 || BUFFER_SIZE <= 0)
 		return NULL;
-	while (1)
-	{ // Étape 1: Remplir le buffer s'il est vide
-		if (buf[0] == '\0')
+		
+	while(1)
+	{
+		if(buf[0] == '\0')
 		{
 			rd = read(fd, buf, BUFFER_SIZE);
-			if (rd <= 0)
+			if(rd < 0)
 			{
-				if (line && *line) // Retourner la dernière ligne sans '\n'
+				free(line);
+				return NULL;
+			}
+			if (rd == 0)
+			{
+				if (line && *line)
 					return line;
 				free(line);
 				return NULL;
 			}
 			buf[rd] = '\0';
-		} 
-		// Étape 2: Chercher le caractère newline dans le buffer
+		}
 		nl = ft_strchr(buf, '\n');
 		if (nl)
-		{ // Ajouter la portion jusqu'au '\n' inclus à la ligne
+		{
 			if (!str_append_mem(&line, buf, (size_t)(nl - buf + 1)))
-				return (free(line), NULL); 
-			// Étape 3: Décaler le contenu restant au début du buffer
+				return(free(line), NULL);
 			ft_memmove(buf, nl + 1, ft_strlen(nl + 1) + 1);
 			return line;
-		} // Étape 4: Pas de '\n' trouvé -> ajouter tout le buffer à la ligne
+		}
 		if (!str_append_mem(&line, buf, ft_strlen(buf)))
-			return (free(line), NULL);
-		buf[0] = '\0'; // Marquer le buffer comme consommé
+			return(free(line), NULL);
+		buf[0] = '\0';
 	}
+}
+
+int	main(int ac, char **av)
+{
+	char	*line;
+	int		fd = 0;
+
+	if (ac != 2)
+		return 1;
+	fd = open(av[1], O_RDONLY);
+	if(fd < 0)
+		return 1;
+	while((line = get_next_line(fd)))
+	{
+		printf("%s", line);
+		free(line);
+	}
+	if (ac == 2)
+		close(fd);
+	return 0;
+
 }
